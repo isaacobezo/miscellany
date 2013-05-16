@@ -11,9 +11,10 @@ import datetime
 from csv import DictWriter, QUOTE_ALL
 from codecs import open
 
+ENCODING = 'latin-1'
 # want to make sure that we have the encoding set correctly to deal with WEB data.
 reload(sys)
-sys.setdefaultencoding("utf-8")
+sys.setdefaultencoding(ENCODING)
 
 DATE_TIME_MASK = '%m/%d/%Y %H:%M:%S'
 IGNORES = ['tags']
@@ -52,7 +53,7 @@ def main(file_to_conv, output_file=None):
         output_file = os.path.splitext(file_to_conv)[0] + '.csv'
 
     print "Opening:", file_to_conv
-    input_file = open(file_to_conv, 'rb').readlines()
+    input_file = open(file_to_conv, 'rb', encoding=ENCODING).readlines()
     src = []
     # make sure that we trim the json file
     for i, line in enumerate(input_file):
@@ -71,7 +72,7 @@ def main(file_to_conv, output_file=None):
     first_row = data.next()
     headers = first_row.keys()
 
-    csv_file = DictWriter(open(output_file, 'wb', encoding='utf-8'),delimiter=',', quotechar='"', quoting=QUOTE_ALL, fieldnames=headers)
+    csv_file = DictWriter(open(output_file, 'wb', encoding=ENCODING),delimiter=',', quotechar='"', quoting=QUOTE_ALL, fieldnames=headers)
     csv_file.writeheader()
     csv_file.writerow(first_row)
     for row in data:
@@ -91,7 +92,10 @@ def flatten_results(data, transforms=TRANSFORMS, ignores=IGNORES, value_transfor
             if k.lower() in ignores: continue
             for new_key, lmd in transforms.items():
                 if v is None: continue
-                lmd = lmd(k,v)
+                try:
+                    lmd = lmd(k,v)
+                except:
+                    lmd = None
                 if lmd is None: continue
                 new_row[new_key] = lmd
                 if not k in skip_keys: skip_keys.append(k)
