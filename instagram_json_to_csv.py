@@ -51,6 +51,7 @@ def main(file_to_conv, output_file=None):
     # name output file to input file if not defined
     if output_file is None:
         output_file = os.path.splitext(file_to_conv)[0] + '.csv'
+    tag_output_file = output_file.replace('.csv', '_tags.csv')
 
     print "Opening:", file_to_conv
     input_file = open(file_to_conv, 'rb', encoding=ENCODING).readlines()
@@ -67,17 +68,40 @@ def main(file_to_conv, output_file=None):
     print "Flattening the data"
 
     data = flatten_results(data)
+    print "flattened results"
 
-    print "Writing to CSV:", output_file
-    first_row = data.next()
+    first_row, first_tags = data.next()
+
     headers = first_row.keys()
+    tag_headers = first_tags[0].keys()
 
-    csv_file = DictWriter(open(output_file, 'wb', encoding=ENCODING),delimiter=',', quotechar='"', quoting=QUOTE_ALL, fieldnames=headers)
-    csv_file.writeheader()
-    csv_file.writerow(first_row)
-    for row in data:
-        csv_file.writerow(row)
-    print "File written:", output_file
+    print "Creating CSV files;", output_file, 'and', tag_output_file
+
+    # create tag and data writers
+    data_writer = csv_writer(output_file, headers)
+    tags_writer = csv_writer(tag_output_file, tag_headers)
+
+    data_writer.writerow(first_row)
+    for tag in first_tags:  tags_writer.writerow(tag)
+
+
+    # now write the date
+    for data_row, tags_rows in data:
+        data_writer.writerow(data_row)
+        for tag in tags_rows:
+            tags_writer.writerow(tag)
+
+    print "Done, files written;", output_file, 'and', tag_output_file
+
+
+
+def csv_writer(file_name, headers, encoding=ENCODING):
+    fn = open(file_name, 'wb+', encoding=encoding)
+    writer = DictWriter(fn, delimiter=',', quotechar='"', quoting=QUOTE_ALL, fieldnames=headers)
+    writer.writeheader()
+    return writer
+
+
 
 def flatten_results(data, transforms=TRANSFORMS, ignores=IGNORES, value_transforms=VALUE_TRANSFORMS):
     """ Convert the JSON results into flattened list so that
@@ -86,10 +110,14 @@ def flatten_results(data, transforms=TRANSFORMS, ignores=IGNORES, value_transfor
     skip_keys = []
     for row in data:
         new_row = {}
+        tags = []
         for k,v in row.items():
             if type(v) is str:
                 v = v.replace('"',"'")
-            if k.lower() in ignores: continue
+            if k == 'tags':
+                for tag in v:
+                    tags.append({'id': row['id'], 'tag': tag.lower()})
+                continue
             for new_key, lmd in transforms.items():
                 if v is None: continue
                 try:
@@ -111,7 +139,7 @@ def flatten_results(data, transforms=TRANSFORMS, ignores=IGNORES, value_transfor
             if k in skip_keys: continue
             if not new_row.has_key(k): new_row[k] = v
 
-        yield new_row
+        yield new_row, tags
 
 
 if __name__ == "__main__":
